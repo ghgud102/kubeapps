@@ -6,7 +6,11 @@ FROM 10.120.105.228/docker/bitnami/node:20.18.0 AS build
 
 WORKDIR /app
 
-COPY package.json yarn.lock /app/
+# podman build --tls-verify=false \
+#   -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$HARBOR_APP_NAME:$BUILD_NUMBER \
+#   -f Kubeapps/dashboard/Dockerfile \
+#   Kubeapps
+COPY ./package.json ./yarn.lock /app/
 RUN yarn install --frozen-lockfile
 
 RUN mkdir /app/src
