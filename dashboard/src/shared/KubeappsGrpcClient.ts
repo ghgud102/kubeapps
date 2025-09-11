@@ -56,7 +56,8 @@ export class KubeappsGrpcClient {
       const kubeappsSaNamespace = "kubeapps";
       const kubeappsSaName = "kubeapps-admin";
       const openApiHostname = "10.120.105.31:31004";
-      const tokenRequestSaToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImplcktWSnRndDc3Y2l1VXUwSVk5SVBKMXBaMlRIdjRzanRkYTM5V3QxZTQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlYXBwcyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJlYXBwcy10b2tlbi1yZXF1ZXN0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Imt1YmVhcHBzLXRva2VuLXJlcXVlc3QiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJiYjUxMmUzNy1iZjUyLTRmNjAtYjgyNy02MDBhZDFiNzczNWUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZWFwcHM6a3ViZWFwcHMtdG9rZW4tcmVxdWVzdCJ9.EqB53u6pcRntHdLj0qkuYud2e_FohLtcINT2pFQbBaRsCNW_2TVVNkCxKhg1yKCSTUonBQ8KUMEN9tv1oxm6dRVp2AOBe-AqYHoboyM34hpddr6_YkxZPyhdsvamang6-G7-W_leW2HfYgtDG2O-xj_2yDHbngIliT10iHNosEqHAp3jAFgOduRnbLxU7sXKILzdf02UcKjROKPBEJG3eT5XoDSW4_7QbNuG9cdsfOK_944MJ-1mVBS0Jlv5e2dq0eidIPglKwO6CW6xJEoF2drFj2v2l1pgwq_TpiORqbc-fUybkuz32UzcPtzL2qG7omljj6PSA7wb-nMN8V2c2g"
+      const tokenRequestSaToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6ImplcktWSnRndDc3Y2l1VXUwSVk5SVBKMXBaMlRIdjRzanRkYTM5V3QxZTQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlYXBwcyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJlYXBwcy10b2tlbi1yZXF1ZXN0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Imt1YmVhcHBzLXRva2VuLXJlcXVlc3QiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJiYjUxMmUzNy1iZjUyLTRmNjAtYjgyNy02MDBhZDFiNzczNWUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZWFwcHM6a3ViZWFwcHMtdG9rZW4tcmVxdWVzdCJ9.EqB53u6pcRntHdLj0qkuYud2e_FohLtcINT2pFQbBaRsCNW_2TVVNkCxKhg1yKCSTUonBQ8KUMEN9tv1oxm6dRVp2AOBe-AqYHoboyM34hpddr6_YkxZPyhdsvamang6-G7-W_leW2HfYgtDG2O-xj_2yDHbngIliT10iHNosEqHAp3jAFgOduRnbLxU7sXKILzdf02UcKjROKPBEJG3eT5XoDSW4_7QbNuG9cdsfOK_944MJ-1mVBS0Jlv5e2dq0eidIPglKwO6CW6xJEoF2drFj2v2l1pgwq_TpiORqbc-fUybkuz32UzcPtzL2qG7omljj6PSA7wb-nMN8V2c2g";
 
       // 특정 클러스터의 'kubeapps-admin' SA 토큰 발급
       // 이미 발급된 토큰이 있고, 만료까지 1분 이상 남았다면 재사용
@@ -95,15 +96,15 @@ export class KubeappsGrpcClient {
               }),
             },
           )
-            .then((res) => {
+            .then(res => {
               // 토큰 발급 실패 처리
               if (!res.ok) {
                 throw new Error("Failed to fetch SA token");
               }
               return res.json();
             })
-            .then((data) => {
-              // 응답에서 token과 만료 시간 추출 
+            .then(data => {
+              // 응답에서 token과 만료 시간 추출
               this.saToken = data.status?.token;
               if (data.status?.expirationTimestamp) {
                 this.saTokenExpiry = new Date(data.status.expirationTimestamp);
