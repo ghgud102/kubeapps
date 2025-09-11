@@ -41,6 +41,7 @@ export class KubeappsGrpcClient {
   private transport: Transport;
   private saToken?: string; // 캐시용
   private saTokenPromise?: Promise<string>; // 동시에 여러 요청이 발생했을 때 처리
+  private saTokenExpiry?: Date;
 
   // Creates a client with a transport, ensuring the transport includes the auth header.
   constructor(token?: string) {
@@ -55,53 +56,98 @@ export class KubeappsGrpcClient {
       const kubeappsSaNamespace = "kubeapps";
       const kubeappsSaName = "kubeapps-admin";
       const openApiHostname = "10.120.105.31:31004";
+      const tokenRequestSaToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImplcktWSnRndDc3Y2l1VXUwSVk5SVBKMXBaMlRIdjRzanRkYTM5V3QxZTQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlYXBwcyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJlYXBwcy10b2tlbi1yZXF1ZXN0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Imt1YmVhcHBzLXRva2VuLXJlcXVlc3QiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJiYjUxMmUzNy1iZjUyLTRmNjAtYjgyNy02MDBhZDFiNzczNWUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZWFwcHM6a3ViZWFwcHMtdG9rZW4tcmVxdWVzdCJ9.EqB53u6pcRntHdLj0qkuYud2e_FohLtcINT2pFQbBaRsCNW_2TVVNkCxKhg1yKCSTUonBQ8KUMEN9tv1oxm6dRVp2AOBe-AqYHoboyM34hpddr6_YkxZPyhdsvamang6-G7-W_leW2HfYgtDG2O-xj_2yDHbngIliT10iHNosEqHAp3jAFgOduRnbLxU7sXKILzdf02UcKjROKPBEJG3eT5XoDSW4_7QbNuG9cdsfOK_944MJ-1mVBS0Jlv5e2dq0eidIPglKwO6CW6xJEoF2drFj2v2l1pgwq_TpiORqbc-fUybkuz32UzcPtzL2qG7omljj6PSA7wb-nMN8V2c2g"
 
       // 특정 클러스터의 'kubeapps-admin' SA 토큰 발급
-      // saToken이 이미 있으면 그대로 사용
-      if (!this.saToken) {
-        // 여러 요청이 동시에 들어올 때 fetch가 중복되지 않도록 Promise 저장
+      // 이미 발급된 토큰이 있고, 만료까지 1분 이상 남았다면 재사용
+      // 불필요한 토큰 재발급 방지, 성능 최적화
+      const getSaToken = async (): Promise<string> => {
+        if (
+          this.saToken &&
+          this.saTokenExpiry &&
+          this.saTokenExpiry.getTime() > Date.now() + 60_000
+        ) {
+          return this.saToken;
+        }
+
+        // 동시에 여러 요청이 들어올 경우 중복 fetch 방지
+        // Promise를 공유하여 race condition 방지
         if (!this.saTokenPromise) {
           this.saTokenPromise = fetch(
             `http://${openApiHostname}/k8s/api/v1/clusters/${cluster}/namespaces/${kubeappsSaNamespace}/serviceaccounts/${kubeappsSaName}/token`,
             {
+              method: "POST",
               headers: {
-                Authorization: `Bearer ${token ?? Auth.getAuthToken()}`, // OIDC 로그인 토큰으로 인증
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token ?? tokenRequestSaToken}`, // 로그인한 사용자의 OIDC 토큰 대신 token request secret을 사용하여 open-api-k8s에 인증
               },
+              body: JSON.stringify({
+                apiVersion: "authentication.k8s.io/v1",
+                kind: "TokenRequest",
+                metadata: {
+                  name: kubeappsSaName,
+                  namespace: kubeappsSaNamespace,
+                },
+                spec: {
+                  audiences: ["kubernetes"],
+                  expirationSeconds: 3600,
+                },
+              }),
             },
           )
-            .then(res => {
+            .then((res) => {
+              // 토큰 발급 실패 처리
               if (!res.ok) {
                 throw new Error("Failed to fetch SA token");
               }
               return res.json();
             })
-            .then(data => {
-              // K8s tokenRequest 응답 형식은 { status: { token: "..." } }
+            .then((data) => {
+              // 응답에서 token과 만료 시간 추출 
               this.saToken = data.status?.token;
+              if (data.status?.expirationTimestamp) {
+                this.saTokenExpiry = new Date(data.status.expirationTimestamp);
+              } else {
+                // // 만료 정보 없으면 기본 1시간 후로 설정
+                this.saTokenExpiry = new Date(Date.now() + 3600 * 1000);
+              }
               return this.saToken!;
             })
             .finally(() => {
+              // Promise 해제
               this.saTokenPromise = undefined;
             });
         }
-      }
 
-      // 요청 URL 을 확인해서 생성 API일 경우 Authorization 헤더를 교체
-      if (req.url.endsWith("PackagesService/CreateInstalledPackage")) {
-        // const saToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImplcktWSnRndDc3Y2l1VXUwSVk5SVBKMXBaMlRIdjRzanRkYTM5V3QxZTQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlYXBwcyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJlYXBwcy1tb25pdG9yaW5nLWFkbWluLXRva2VuIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Imt1YmVhcHBzLW1vbml0b3JpbmctYWRtaW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI1ZWM5M2Y3OC03YWUyLTQyZDYtODgyYy04M2YwOGRkZjg2MTkiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZWFwcHM6a3ViZWFwcHMtbW9uaXRvcmluZy1hZG1pbiJ9.PUvnnivOb3NZhrLYP4BHbQqKL90LVWLnG7BMuEhj8ZqSk66YEcRH82G51O9BbwJhkUe-zs6vIEZkyApFyPdq5KvaYOJLL6fyb80FyxSMZkQ4JbVBYO7gjMEaA3sU-UkTJBDWJkd_JVB0b9gPrGUusNmuyH3o5iRMEE8LDpC7H7IXhmnfR0k3XgRORZNM35GYnSCVAEMxI0F6Ckqf2xqqAndDSBE7LPWs920otINryeYj-XFmMGhZnMtacgBnnzEfatpGC-Tc6XkMJrnfpLChBfMRmXVVhltoT2KGcO89TqxNcY2Qr79DEymugdG8S06cq9N3sR_OkIRqTvzGsvcD1w";
-        req.header.set("Authorization", `Bearer ${this.saToken}`);
+        return this.saTokenPromise; // 중복 방지용 Promise 반환
+      };
+
+      // CUD 요청이면 SA 토큰 사용
+      const isCudRequest =
+        req.url.includes("PackagesService/CreateInstalledPackage") ||
+        req.url.includes("PackagesService/UpdateInstalledPackage") ||
+        req.url.includes("PackagesService/DeleteInstalledPackage");
+
+      if (isCudRequest) {
+        // CUD 요청이면 SA 토큰 가져오기
+        const saToken = await getSaToken();
+        req.header.set("Authorization", `Bearer ${saToken}`);
       } else {
-        // 기본 동작: 기존의 로그인한 사용자의 OIDC 토큰 사용
-        const t = token ? token : Auth.getAuthToken();
+        // 그 외 요청은 로그인한 사용자의 OIDC 토큰 사용
+        const t = token ?? Auth.getAuthToken();
         if (t) {
           req.header.set("Authorization", `Bearer ${t}`);
         }
       }
+
+      // 다음 interceptor 또는 실제 gRPC 호출 진행
       return await next(req);
     };
+
+    // gRPC transport 생성
     this.transport = createGrpcWebTransport({
       baseUrl: `./${URL.api.kubeappsapis}`,
-      interceptors: [auth],
+      interceptors: [auth], // 인증 인터셉터 등록
     });
   }
 
