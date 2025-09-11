@@ -26,16 +26,14 @@ import { ResourcesService } from "gen/kubeappsapis/plugins/resources/v1alpha1/re
 import { Auth } from "./Auth";
 import * as URL from "./url";
 
-function parseClusterAndNamespace(url: string): { cluster?: string; namespace?: string } {
+function parseCluster(url: string): { cluster?: string } {
   // URL의 해시(#) 이후 부분만 사용
   const hashPath = url.split("#")[1] ?? "";
 
   const clusterMatch = hashPath.match(/\/c\/([^/]+)/);
-  const namespaceMatch = hashPath.match(/\/ns\/([^/]+)/);
 
   return {
     cluster: clusterMatch ? clusterMatch[1] : undefined,
-    namespace: namespaceMatch ? namespaceMatch[1] : undefined,
   };
 }
 
@@ -50,8 +48,8 @@ export class KubeappsGrpcClient {
     // 프론트엔드 KubeappsGrpcClient 의 인터셉터에서
     // Kubeapps 관리자 서비스어카운트에 해당하는 인증 헤더 주입
     const auth: Interceptor = next => async req => {
-      // url에서 클러스터, 네임스페이스 데이터 추출
-      const { cluster, namespace } = parseClusterAndNamespace(req.url);
+      // url에서 클러스터 데이터 추출
+      const cluster = parseCluster(req.url);
 
       // deployment 리소스의 특정 경로에 새 configmap을 마운트하는 방식으로 아래 환경변수 사용 필요
       const kubeappsSaNamespace = "kubeapps";
