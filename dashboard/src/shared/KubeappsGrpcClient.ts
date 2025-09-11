@@ -28,7 +28,7 @@ import * as URL from "./url";
 
 function parseClusterAndNamespace(url: string): { cluster?: string; namespace?: string } {
   // URL의 해시(#) 이후 부분만 사용
-  const hashPath = url.split('#')[1] ?? '';
+  const hashPath = url.split("#")[1] ?? "";
 
   const clusterMatch = hashPath.match(/\/c\/([^/]+)/);
   const namespaceMatch = hashPath.match(/\/ns\/([^/]+)/);
@@ -43,22 +43,20 @@ export class KubeappsGrpcClient {
   private transport: Transport;
   private saToken?: string; // 캐시용
   private saTokenPromise?: Promise<string>; // 동시에 여러 요청이 발생했을 때 처리
-  
+
   // Creates a client with a transport, ensuring the transport includes the auth header.
   constructor(token?: string) {
     // CUD 오퍼레이팅 시 정상 동작을 위하여
     // 프론트엔드 KubeappsGrpcClient 의 인터셉터에서
     // Kubeapps 관리자 서비스어카운트에 해당하는 인증 헤더 주입
     const auth: Interceptor = next => async req => {
-
-
       // url에서 클러스터, 네임스페이스 데이터 추출
       const { cluster, namespace } = parseClusterAndNamespace(req.url);
-      
+
       // deployment 리소스의 특정 경로에 새 configmap을 마운트하는 방식으로 아래 환경변수 사용 필요
-      const kubeappsSaNamespace = "kubeapps"
-      const kubeappsSaName = "kubeapps-admin"
-      const openApiHostname = "10.120.105.31:31004"
+      const kubeappsSaNamespace = "kubeapps";
+      const kubeappsSaName = "kubeapps-admin";
+      const openApiHostname = "10.120.105.31:31004";
 
       // 특정 클러스터의 'kubeapps-admin' SA 토큰 발급
       // saToken이 이미 있으면 그대로 사용
@@ -71,7 +69,7 @@ export class KubeappsGrpcClient {
               headers: {
                 Authorization: `Bearer ${token ?? Auth.getAuthToken()}`, // OIDC 로그인 토큰으로 인증
               },
-            }
+            },
           )
             .then(res => {
               if (!res.ok) {
@@ -92,7 +90,7 @@ export class KubeappsGrpcClient {
 
       // 요청 URL 을 확인해서 생성 API일 경우 Authorization 헤더를 교체
       if (req.url.endsWith("PackagesService/CreateInstalledPackage")) {
-        // const saToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImplcktWSnRndDc3Y2l1VXUwSVk5SVBKMXBaMlRIdjRzanRkYTM5V3QxZTQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlYXBwcyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJlYXBwcy1tb25pdG9yaW5nLWFkbWluLXRva2VuIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Imt1YmVhcHBzLW1vbml0b3JpbmctYWRtaW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI1ZWM5M2Y3OC03YWUyLTQyZDYtODgyYy04M2YwOGRkZjg2MTkiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZWFwcHM6a3ViZWFwcHMtbW9uaXRvcmluZy1hZG1pbiJ9.PUvnnivOb3NZhrLYP4BHbQqKL90LVWLnG7BMuEhj8ZqSk66YEcRH82G51O9BbwJhkUe-zs6vIEZkyApFyPdq5KvaYOJLL6fyb80FyxSMZkQ4JbVBYO7gjMEaA3sU-UkTJBDWJkd_JVB0b9gPrGUusNmuyH3o5iRMEE8LDpC7H7IXhmnfR0k3XgRORZNM35GYnSCVAEMxI0F6Ckqf2xqqAndDSBE7LPWs920otINryeYj-XFmMGhZnMtacgBnnzEfatpGC-Tc6XkMJrnfpLChBfMRmXVVhltoT2KGcO89TqxNcY2Qr79DEymugdG8S06cq9N3sR_OkIRqTvzGsvcD1w"; 
+        // const saToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImplcktWSnRndDc3Y2l1VXUwSVk5SVBKMXBaMlRIdjRzanRkYTM5V3QxZTQifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlYXBwcyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJlYXBwcy1tb25pdG9yaW5nLWFkbWluLXRva2VuIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Imt1YmVhcHBzLW1vbml0b3JpbmctYWRtaW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI1ZWM5M2Y3OC03YWUyLTQyZDYtODgyYy04M2YwOGRkZjg2MTkiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZWFwcHM6a3ViZWFwcHMtbW9uaXRvcmluZy1hZG1pbiJ9.PUvnnivOb3NZhrLYP4BHbQqKL90LVWLnG7BMuEhj8ZqSk66YEcRH82G51O9BbwJhkUe-zs6vIEZkyApFyPdq5KvaYOJLL6fyb80FyxSMZkQ4JbVBYO7gjMEaA3sU-UkTJBDWJkd_JVB0b9gPrGUusNmuyH3o5iRMEE8LDpC7H7IXhmnfR0k3XgRORZNM35GYnSCVAEMxI0F6Ckqf2xqqAndDSBE7LPWs920otINryeYj-XFmMGhZnMtacgBnnzEfatpGC-Tc6XkMJrnfpLChBfMRmXVVhltoT2KGcO89TqxNcY2Qr79DEymugdG8S06cq9N3sR_OkIRqTvzGsvcD1w";
         req.header.set("Authorization", `Bearer ${this.saToken}`);
       } else {
         // 기본 동작: 기존의 로그인한 사용자의 OIDC 토큰 사용
